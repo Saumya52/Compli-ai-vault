@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { UserManagementDialog } from "@/components/UserManagementDialog";
 import { ClientSwitcher } from "@/components/ClientSwitcher";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DashboardHeaderProps {
   currentView?: string;
@@ -13,6 +14,8 @@ interface DashboardHeaderProps {
 }
 
 const DashboardHeader = ({ currentView = "dashboard", onNavigate, onAddClient }: DashboardHeaderProps) => {
+  const { user, logout } = useAuth();
+
   return (
     <header className="bg-card border-b border-border shadow-soft">
       <div className="container mx-auto px-6 py-4">
@@ -128,11 +131,11 @@ const DashboardHeader = ({ currentView = "dashboard", onNavigate, onAddClient }:
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">John Doe</p>
-                    <p className="text-xs text-muted-foreground">john.doe@company.com</p>
+                    <p className="text-sm font-medium">{user?.name}</p>
+                    <p className="text-xs text-muted-foreground">{user?.email}</p>
                     <Badge variant="secondary" className="w-fit text-xs">
                       <Shield className="w-3 h-3 mr-1" />
-                      Admin
+                      {user?.role}
                     </Badge>
                   </div>
                 </DropdownMenuLabel>
@@ -150,7 +153,7 @@ const DashboardHeader = ({ currentView = "dashboard", onNavigate, onAddClient }:
                   Account Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer text-red-600">
+                <DropdownMenuItem className="cursor-pointer text-red-600" onClick={logout}>
                   Sign Out
                 </DropdownMenuItem>
               </DropdownMenuContent>

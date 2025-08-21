@@ -24,14 +24,16 @@ import { TaskFunnelStats } from "@/components/TaskFunnelStats";
 import { BillingStatusSnapshot } from "@/components/BillingStatusSnapshot";
 import { AutoComplianceClock } from "@/components/AutoComplianceClock";
 import { RecentAIFeedbackLogs } from "@/components/RecentAIFeedbackLogs";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState<any[]>([]);
   const [currentView, setCurrentView] = useState("dashboard");
   const [showClientOnboarding, setShowClientOnboarding] = useState(false);
   
   // Enhanced dashboard state
-  const [userRole] = useState<"admin" | "cfo" | "team_member">("admin");
+  const userRole = user?.role || "team_member";
   const [dashboardViewMode, setDashboardViewMode] = useState<DashboardViewMode>("my_tasks");
   const [filters, setFilters] = useState({
     entity: "All Entities",

@@ -30,6 +30,7 @@ import { format } from "date-fns";
 import { TaskComments } from "./TaskComments";
 import { TaskDocuments } from "./TaskDocuments";
 import { TaskDependencies } from "./TaskDependencies";
+import { reassignTask } from "@/utils/api";
 
 export interface EnhancedTask {
   id: string;
@@ -52,6 +53,7 @@ export interface EnhancedTask {
   completedHours?: number;
   lastUpdated: Date;
   aiSuggestions: string[];
+  closureRightsEmail?: string;
 }
 
 interface TaskCardProps {
@@ -129,12 +131,9 @@ export const TaskCard = ({
   };
 
   const handleQuickReassign = (newAssignee: string) => {
+    // Call the parent component's reassign handler which now uses the API
     onReassign(task.id, newAssignee);
     setIsReassignDialogOpen(false);
-    toast({
-      title: "Task Reassigned",
-      description: `Task assigned to ${newAssignee}`,
-    });
   };
 
   const handleQuickPriorityChange = (newPriority: string) => {

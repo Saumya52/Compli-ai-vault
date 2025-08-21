@@ -78,14 +78,10 @@ export const BulkActions = ({
       return;
     }
 
+    // Call the parent component's bulk reassign handler which now uses the API
     onBulkReassign(selectedTasks, newAssignee);
     setShowReassignDialog(false);
     setNewAssignee("");
-    
-    toast({
-      title: "Tasks Reassigned",
-      description: `${selectedTasks.length} tasks assigned to ${newAssignee}`,
-    });
   };
 
   const handleBulkMarkComplete = () => {

@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { createTask } from "@/utils/api";
+import { useToast } from "@/hooks/use-toast";
 
 interface CreateTaskDialogProps {
   children: React.ReactNode;
@@ -17,6 +19,7 @@ interface CreateTaskDialogProps {
 }
 
 const CreateTaskDialog = ({ children, onTaskCreate }: CreateTaskDialogProps) => {
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [taskName, setTaskName] = useState("");
   const [bucket, setBucket] = useState("");
@@ -24,32 +27,100 @@ const CreateTaskDialog = ({ children, onTaskCreate }: CreateTaskDialogProps) => 
   const [frequency, setFrequency] = useState("");
   const [assignee, setAssignee] = useState("");
   const [alertsList, setAlertsList] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const newTask = {
-      id: Date.now().toString(),
-      name: taskName,
+    if (!taskName || !bucket || !dueDate || !frequency || !assignee) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsCreating(true);
+
+    // Prepare task data for API
+    const apiTaskData = {
+      title: taskName,
+      description: `Task created manually via dashboard`,
       bucket,
       dueDate,
       frequency,
-      assignee,
-      alerts: alertsList.split(',').map(email => email.trim()).filter(Boolean),
-      status: 'pending',
-      createdAt: new Date()
+      assignedTo: assignee,
+      status: 'open',
+      priority: 'medium',
+      entity: 'Default Entity', // You might want to add entity selection to the form
+      estimatedHours: 0,
+      closureRightsEmail: assignee,
+      tags: []
     };
 
-    onTaskCreate(newTask);
-    
-    // Reset form
-    setTaskName("");
-    setBucket("");
-    setDueDate(undefined);
-    setFrequency("");
-    setAssignee("");
-    setAlertsList("");
-    setOpen(false);
+    try {
+      const result = await createTask(apiTaskData);
+      
+      if (result.success) {
+        // Create UI version for local state
+        const uiTask = {
+          id: result.data?.id || Date.now().toString(),
+          name: taskName,
+          title: taskName,
+          bucket,
+          dueDate,
+          frequency,
+          assignee,
+          assigneeName: assignee,
+          alerts: alertsList.split(',').map(email => email.trim()).filter(Boolean),
+          status: 'open',
+          priority: 'medium',
+          createdAt: new Date(),
+          entity: 'Default Entity',
+          tags: [],
+          dependencies: [],
+          hasDocumentsPending: false,
+          hasValidationIssues: false,
+          estimatedHours: 0,
+          completedHours: 0,
+          lastUpdated: new Date(),
+          aiSuggestions: [],
+          closureRightsEmail: assignee
+        };
+
+        onTaskCreate(uiTask);
+        
+        // Reset form
+        setTaskName("");
+        setBucket("");
+        setDueDate(undefined);
+        setFrequency("");
+        setAssignee("");
+        setAlertsList("");
+        setOpen(false);
+        
+        toast({
+          title: "Task Created Successfully",
+          description: `Task "${taskName}" has been created and saved to database`,
+        });
+      } else {
+        toast({
+          title: "Task Creation Failed",
+          description: result.error || "Failed to create task",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Task creation error:', error);
+      toast({
+        title: "Task Creation Error",
+        description: "An unexpected error occurred while creating the task",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -160,7 +231,16 @@ const CreateTaskDialog = ({ children, onTaskCreate }: CreateTaskDialogProps) => 
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit">Create Task</Button>
+            <Button type="submit" disabled={isCreating}>
+              {isCreating ? (
+                <>
+                  <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Creating...
+                </>
+              ) : (
+                "Create Task"
+              )}
+            </Button>
           </div>
         </form>
       </DialogContent>

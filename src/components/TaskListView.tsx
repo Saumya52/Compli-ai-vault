@@ -8,6 +8,8 @@ import { TaskFilters } from "./tasks/TaskFilters";
 import { TaskCard, type EnhancedTask } from "./tasks/TaskCard";
 import { BulkActions } from "./tasks/BulkActions";
 import CreateTaskDialog from "./CreateTaskDialog";
+import { uploadTasksCSV, transformUploadedTask, transformUploadedTaskForAPI, createTask, reassignTask, type TaskUploadData } from "@/utils/api";
+import { TaskUploadProgress } from "./TaskUploadProgress";
 
 interface TaskListViewProps {
   tasks: any[];
@@ -32,6 +34,9 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
   
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<any>(null);
+  const [showUploadResult, setShowUploadResult] = useState(false);
 
   // Mock enhanced tasks data
   const enhancedTasks: EnhancedTask[] = [
@@ -111,44 +116,100 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
     );
   };
 
-  const handleBulkReassign = (taskIds: string[], assignee: string) => {
-    toast({ title: "Success", description: `${taskIds.length} tasks reassigned to ${assignee}` });
+  const handleBulkReassign = async (taskIds: string[], assignee: string) => {
+    try {
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const taskId of taskIds) {
+        const result = await reassignTask(taskId, { assignedTo: assignee });
+        if (result.success) {
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      }
+      
+      if (successCount > 0) {
+        toast({ 
+          title: "Bulk Reassignment Complete", 
+          description: `${successCount} tasks reassigned to ${assignee}${errorCount > 0 ? `, ${errorCount} failed` : ''}` 
+        });
+      } else {
+        toast({ 
+          title: "Reassignment Failed", 
+          description: "Failed to reassign tasks",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({ 
+        title: "Bulk Reassignment Error", 
+        description: "An error occurred during bulk reassignment",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleBulkMarkComplete = (taskIds: string[]) => {
+    // TODO: Call API to bulk update task status to completed
     toast({ title: "Success", description: `${taskIds.length} tasks marked as completed` });
   };
 
   const handleBulkSetAlerts = (taskIds: string[], alertType: string) => {
+    // TODO: Call API to set alerts for multiple tasks
     toast({ title: "Success", description: `Alerts set for ${taskIds.length} tasks` });
   };
 
   const handleBulkDownloadSummary = (taskIds: string[]) => {
+    // TODO: Generate and download summary report for selected tasks
     toast({ title: "Success", description: `Downloading summary for ${taskIds.length} tasks` });
   };
 
   // Task action handlers
   const handleStatusUpdate = (taskId: string, status: string) => {
+    // TODO: Call API to update task status
     toast({ title: "Status Updated", description: `Task status updated to ${status}` });
   };
 
-  const handleReassign = (taskId: string, assignee: string) => {
-    toast({ title: "Task Reassigned", description: `Task assigned to ${assignee}` });
+  const handleReassign = async (taskId: string, assignee: string) => {
+    try {
+      const result = await reassignTask(taskId, { assignedTo: assignee });
+      if (result.success) {
+        toast({ title: "Task Reassigned", description: `Task assigned to ${assignee}` });
+      } else {
+        toast({ 
+          title: "Reassignment Failed", 
+          description: result.error || "Failed to reassign task",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({ 
+        title: "Reassignment Error", 
+        description: "An error occurred while reassigning the task",
+        variant: "destructive"
+      });
+    }
   };
 
   const handlePriorityChange = (taskId: string, priority: string) => {
+    // TODO: Call API to update task priority
     toast({ title: "Priority Updated", description: `Task priority set to ${priority}` });
   };
 
   const handleCreateTicket = (taskId: string) => {
+    // TODO: Call API to create compliance ticket
     toast({ title: "Ticket Created", description: "Compliance ticket generated successfully" });
   };
 
   const handleAddComment = (taskId: string, comment: string) => {
+    // TODO: Call API to add comment to task
     toast({ title: "Comment Added", description: "Your comment has been posted" });
   };
 
   const handleTagUpdate = (taskId: string, tags: string[]) => {
+    // TODO: Call API to update task tags
     toast({ title: "Tags Updated", description: "Task tags have been updated" });
   };
 
@@ -182,6 +243,106 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
   };
 
   const handleCSVUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    handleCSVUploadToAPI(file);
+  };
+
+  const handleCSVUploadToAPI = async (file: File) => {
+    if (!file.name.endsWith('.csv') && !file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please upload a CSV or Excel file",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    
+    try {
+      const result = await uploadTasksCSV(file);
+      
+      if (result.success && result.data) {
+        // Transform tasks for API creation
+        const apiTasks = result.data.map(transformUploadedTaskForAPI);
+        // Transform tasks for UI display
+        const uiTasks = result.data.map(transformUploadedTask);
+        
+        let successCount = 0;
+        let duplicateCount = 0;
+        const errors: string[] = [];
+        const warnings: string[] = [];
+        
+        // Create tasks in database via API and add to UI
+        for (const [index, apiTask] of apiTasks.entries()) {
+          try {
+            const createResult = await createTask(apiTask);
+            if (createResult.success) {
+              // Add the UI version to local state
+              onTaskCreate(uiTasks[index]);
+              successCount++;
+            } else {
+              errors.push(`Failed to create task: ${apiTask.title} - ${createResult.error}`);
+            }
+          } catch (error) {
+            errors.push(`Failed to create task: ${apiTask.title} - ${error}`);
+          }
+        }
+        
+        // Parse any duplicate information from the API response
+        if (result.message && result.message.includes('Duplicate')) {
+          const duplicateMatches = result.message.match(/Duplicate found:/g);
+          duplicateCount = duplicateMatches ? duplicateMatches.length : 0;
+          warnings.push(`${duplicateCount} duplicate tasks were detected`);
+        }
+        
+        const uploadResult = {
+          fileName: file.name,
+          totalTasks: result.data.length,
+          successfulTasks: successCount,
+          failedTasks: result.data.length - successCount,
+          duplicates: duplicateCount,
+          errors,
+          warnings
+        };
+        
+        setUploadResult(uploadResult);
+        setShowUploadResult(true);
+        
+        toast({
+          title: "Upload Successful",
+          description: `${successCount} tasks uploaded successfully`,
+        });
+      } else {
+        toast({
+          title: "Upload Failed",
+          description: result.error || "Failed to upload tasks",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload Error",
+        description: "An unexpected error occurred during upload",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+      
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  // Legacy CSV parsing function (keeping as fallback)
+  const handleCSVUploadLegacy = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -258,7 +419,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
           <Input
             ref={fileInputRef}
             type="file"
-            accept=".csv"
+            accept=".csv,.xlsx,.xls"
             onChange={handleCSVUpload}
             className="hidden"
           />
@@ -266,9 +427,19 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
           <Button 
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
           >
-            <Upload className="w-4 h-4 mr-2" />
-            Upload CSV
+            {isUploading ? (
+              <>
+                <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4 mr-2" />
+                Upload CSV
+              </>
+            )}
           </Button>
           
           <Button 
@@ -340,6 +511,13 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
           </CardContent>
         </Card>
       )}
+
+      {/* Upload Progress/Result */}
+      <TaskUploadProgress
+        isVisible={showUploadResult}
+        result={uploadResult}
+        onClose={() => setShowUploadResult(false)}
+      />
 
     </div>
   );

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +38,8 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addDays, isToday, differenceInDays } from "date-fns";
+import { getAllTasks } from "@/utils/api";
+import { parseExcelDate } from "@/utils/dateUtils";
 
 type CalendarView = "month" | "week" | "list" | "compliance_type" | "ai_generator";
 type ComplianceBucket = "GST" | "TDS" | "ROC" | "PF" | "ESI" | "Income Tax" | "Labor Law";
@@ -67,9 +70,10 @@ interface CalendarFilters {
 
 interface CalendarViewProps {
   tasks: any[];
+  isLoading?: boolean;
 }
 
-export const EnhancedCalendarView = ({ tasks }: CalendarViewProps) => {
+export const EnhancedCalendarView = ({ tasks, isLoading = false }: CalendarViewProps) => {
   const { toast } = useToast();
   
   // State management
@@ -87,6 +91,7 @@ export const EnhancedCalendarView = ({ tasks }: CalendarViewProps) => {
   });
   const [hoveredTask, setHoveredTask] = useState<ComplianceTask | null>(null);
   const [showExternalSync, setShowExternalSync] = useState(false);
+  const [apiTasks, setApiTasks] = useState<ComplianceTask[]>([]);
   
   // AI Generator states
   const [aiStep, setAiStep] = useState<"company_details" | "questionnaire" | "results">("company_details");
@@ -101,6 +106,34 @@ export const EnhancedCalendarView = ({ tasks }: CalendarViewProps) => {
   const [aiAnswers, setAiAnswers] = useState<Record<number, string>>({});
   const [generatedCompliances, setGeneratedCompliances] = useState<any[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Transform API tasks to calendar format
+  const transformApiTask = (apiTask: any): ComplianceTask => {
+    const dueDate = apiTask.dueDate ? new Date(apiTask.dueDate) : 
+                   apiTask.due_date ? parseExcelDate(apiTask.due_date) : 
+                   new Date();
+    
+    return {
+      id: apiTask.id || apiTask._id || Math.random().toString(),
+      title: apiTask.title || apiTask.name || "Untitled Task",
+      description: apiTask.description || "",
+      dueDate,
+      complianceBucket: (apiTask.bucket || apiTask.complianceType || "GST") as ComplianceBucket,
+      entity: apiTask.entity || "Unknown Entity",
+      assignedTo: apiTask.assignedTo || apiTask.assigned_to || "unassigned",
+      assignedToName: apiTask.assignedToName || apiTask.assigned_to_name || apiTask.assignedTo || "Unassigned",
+      status: (apiTask.status || "pending") as TaskStatus,
+      urgencyLevel: calculateUrgencyLevel(dueDate),
+      isRecurring: apiTask.frequency !== "one-time",
+      priority: (apiTask.priority || "medium") as "low" | "medium" | "high"
+    };
+  };
+
+  useEffect(() => {
+    // Transform API tasks when tasks prop changes
+    const transformedTasks = tasks.map(transformApiTask);
+    setApiTasks(transformedTasks);
+  }, [tasks]);
 
   // Mock compliance tasks with enhanced data
   const mockTasks: ComplianceTask[] = [
@@ -162,6 +195,9 @@ export const EnhancedCalendarView = ({ tasks }: CalendarViewProps) => {
     }
   ];
 
+  // Combine API tasks with mock tasks
+  const allTasks = [...apiTasks];
+
   // Calculate urgency level based on due date
   const calculateUrgencyLevel = (dueDate: Date): UrgencyLevel => {
     const today = new Date();
@@ -197,12 +233,12 @@ export const EnhancedCalendarView = ({ tasks }: CalendarViewProps) => {
 
   // Get tasks for a specific date
   const getTasksForDate = (date: Date): ComplianceTask[] => {
-    return mockTasks.filter(task => isSameDay(task.dueDate, date));
+    return allTasks.filter(task => isSameDay(task.dueDate, date));
   };
 
   // Get filtered tasks
   const getFilteredTasks = (): ComplianceTask[] => {
-    return mockTasks.filter(task => {
+    return allTasks.filter(task => {
       if (filters.entity !== "All Entities" && task.entity !== filters.entity) return false;
       if (filters.complianceType !== "All Types" && task.complianceBucket !== filters.complianceType) return false;
       if (filters.assignee !== "All Users" && task.assignedToName !== filters.assignee) return false;
@@ -386,6 +422,14 @@ export const EnhancedCalendarView = ({ tasks }: CalendarViewProps) => {
               </div>
             </Card>
           ))}
+          
+          {filteredTasks.length === 0 && !isLoading && (
+            <div className="text-center py-8 text-muted-foreground">
+              <CalendarIcon className="w-16 h-16 mx-auto mb-4 opacity-50" />
+              <p>No tasks found</p>
+              <p className="text-sm">Try adjusting your filters or add new tasks</p>
+            </div>
+          )}
         </div>
       </ScrollArea>
     );
@@ -693,7 +737,7 @@ export const EnhancedCalendarView = ({ tasks }: CalendarViewProps) => {
         <div className="flex items-center gap-4">
           <h2 className="text-2xl font-bold">Compliance Calendar</h2>
           <Badge variant="outline">
-            {getFilteredTasks().length} tasks
+            {getFilteredTasks().length} tasks {isLoading && "(loading...)"}
           </Badge>
         </div>
         
@@ -837,6 +881,14 @@ export const EnhancedCalendarView = ({ tasks }: CalendarViewProps) => {
       ) : (
         <Card>
           <CardContent className="p-6">
+            {isLoading && (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-center">
+                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-muted-foreground">Loading tasks from server...</p>
+                </div>
+              </div>
+            )}
             {calendarView === "month" && renderMonthView()}
             {calendarView === "list" && renderListView()}
             {calendarView === "compliance_type" && (

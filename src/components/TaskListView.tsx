@@ -216,20 +216,22 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
   // CSV functionality
   const handleDownloadTemplate = () => {
     const csvHeaders = [
-      "Title",
-      "Description", 
-      "Priority",
-      "Assignee",
-      "Due Date",
-      "Bucket",
-      "Frequency",
-      "Entity",
-      "Tags",
-      "Estimated Hours"
+      "status",
+      "name",
+      "description", 
+      "priority",
+      "assignedTo",
+      "entity",
+      "bucket",
+      "dueDate",
+      "recurringFrequency",
+      "tags",
+      "estimatedHours",
+      "closureRightsEmail"
     ];
     
     const csvContent = csvHeaders.join(",") + "\n" +
-      "Sample Task,Sample task description,high,john.doe,2024-12-31,ROC,Monthly,ABC Pvt Ltd,Urgent;High Priority,8";
+      "open,File Annual Return - Company ABC,Submit annual return for Company ABC to MCA portal with all required documents,high,John Doe,ABC Pvt Ltd,ROC,01-08-2025,yearly,urgent,high,8,abc@example.com";
     
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);

@@ -168,3 +168,34 @@ export const transformUploadedTask = (uploadedTask: TaskUploadData) => {
     closureRightsEmail: uploadedTask.closureRightsEmail || ''
   };
 };
+export const getAllTasks = async (): Promise<ApiResponse<any[]>> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/tasks/get-all-tasks`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    // Since backend gives { tasks: [...] }
+    const tasks = result?.tasks || [];
+
+    return {
+      success: true,
+      data: tasks,
+      message: result.message || "Tasks fetched successfully",
+    };
+  } catch (error) {
+    console.error("Get all tasks error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch tasks",
+    };
+  }
+};

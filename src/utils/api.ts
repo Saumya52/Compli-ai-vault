@@ -168,6 +168,128 @@ export const transformUploadedTask = (uploadedTask: TaskUploadData) => {
     closureRightsEmail: uploadedTask.closureRightsEmail || ''
   };
 };
+
+export const uploadTaskDocument = async (taskId: string, file: File, documentType?: string): Promise<ApiResponse> => {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('taskId', taskId);
+    if (documentType) {
+      formData.append('documentType', documentType);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/tasks/upload-task-doc`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: true,
+      data: result.data || result,
+      message: result.message
+    };
+  } catch (error) {
+    console.error('Document upload error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Document upload failed'
+    };
+  }
+};
+
+export const getTaskComments = async (taskId: string): Promise<ApiResponse> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/comments`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: true,
+      data: result.comments || result.data || [],
+      message: result.message
+    };
+  } catch (error) {
+    console.error('Get comments error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch comments'
+    };
+  }
+};
+
+export const addTaskComment = async (taskId: string, commentData: {
+  content: string;
+  userId: string;
+  userName: string;
+}): Promise<ApiResponse> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/comments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(commentData),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: true,
+      data: result.data || result,
+      message: result.message
+    };
+  } catch (error) {
+    console.error('Add comment error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to add comment'
+    };
+  }
+};
+
+export const getTaskDocuments = async (taskId: string): Promise<ApiResponse> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/documents`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: true,
+      data: result.documents || result.data || [],
+      message: result.message
+    };
+  } catch (error) {
+    console.error('Get documents error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch documents'
+    };
+  }
+};
 export const getAllTasks = async (): Promise<ApiResponse<any[]>> => {
   try {
     const response = await fetch(`${API_BASE_URL}/tasks/get-all-tasks`, {
@@ -183,13 +305,10 @@ export const getAllTasks = async (): Promise<ApiResponse<any[]>> => {
 
     const result = await response.json();
 
-    // Since backend gives { tasks: [...] }
-    const tasks = result?.tasks || [];
-
     return {
       success: true,
-      data: tasks,
-      message: result.message || "Tasks fetched successfully",
+      data: result.tasks || [], // ✅ directly unwrap tasks array
+      message: result.message,
     };
   } catch (error) {
     console.error("Get all tasks error:", error);

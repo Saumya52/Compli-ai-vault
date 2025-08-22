@@ -30,7 +30,8 @@ import { format } from "date-fns";
 import { TaskComments } from "./TaskComments";
 import { TaskDocuments } from "./TaskDocuments";
 import { TaskDependencies } from "./TaskDependencies";
-import { reassignTask } from "@/utils/api";
+import { reassignTask, uploadTaskDocument, getTaskComments, addTaskComment } from "@/utils/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 export interface EnhancedTask {
   id: string;
@@ -66,6 +67,7 @@ interface TaskCardProps {
   onTagUpdate: (taskId: string, tags: string[]) => void;
   isSelected?: boolean;
   onSelectionChange?: (taskId: string, selected: boolean) => void;
+  onDocumentUpload?: (taskId: string, file: File) => void;
 }
 
 export const TaskCard = ({ 
@@ -77,13 +79,64 @@ export const TaskCard = ({
   onAddComment,
   onTagUpdate,
   isSelected,
-  onSelectionChange
+  onSelectionChange,
+  onDocumentUpload
 }: TaskCardProps) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isReassignDialogOpen, setIsReassignDialogOpen] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [comments, setComments] = useState<any[]>([]);
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
 
+  // Load comments when task card is expanded
+  const loadComments = async () => {
+    setIsLoadingComments(true);
+    try {
+      const result = await getTaskComments(task.id);
+      if (result.success && result.data) {
+        setComments(result.data);
+      }
+    } catch (error) {
+      console.error('Failed to load comments:', error);
+    } finally {
+      setIsLoadingComments(false);
+    }
+  };
+
+  const handleAddComment = async (comment: string) => {
+    if (!user?.id || !comment.trim()) return;
+    
+    try {
+      const result = await addTaskComment(task.id, {
+        content: comment,
+        userId: user.id,
+        userName: user.name
+      });
+      
+      if (result.success) {
+        // Refresh comments
+        await loadComments();
+        toast({
+          title: "Comment Added",
+          description: "Your comment has been posted successfully",
+        });
+      } else {
+        toast({
+          title: "Failed to Add Comment",
+          description: result.error || "Could not add comment",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "An error occurred while adding the comment",
+        variant: "destructive"
+      });
+    }
+  };
   const getStatusColor = (status: string) => {
     switch (status) {
       case "completed": return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
@@ -106,15 +159,16 @@ export const TaskCard = ({
 
   const getBucketColor = (bucket: string) => {
     const colors = {
-      "GST": "bg-blue-500",
-      "Income Tax": "bg-green-500",
-      "TDS": "bg-purple-500",
-      "PF": "bg-orange-500",
-      "ESI": "bg-pink-500",
-      "ROC": "bg-indigo-500",
-      "Labor Law": "bg-red-500"
+      "GST": "bg-blue-500 text-white",
+      "Income Tax": "bg-green-500 text-white",
+      "TDS": "bg-purple-500 text-white",
+      "PF": "bg-orange-500 text-white",
+      "ESI": "bg-pink-500 text-white",
+      "ROC": "bg-indigo-500 text-white",
+      "Labor Law": "bg-red-500 text-white",
+      "Labour": "bg-red-500 text-white"
     };
-    return colors[bucket as keyof typeof colors] || "bg-gray-500";
+    return colors[bucket as keyof typeof colors] || "bg-gray-500 text-white";
   };
 
   const isTicketEligible = () => {
@@ -122,6 +176,16 @@ export const TaskCard = ({
     return daysUntilDue <= 7;
   };
 
+  const getStatusBorderColor = (status: string) => {
+    switch (status) {
+      case "completed": return "border-l-green-500";
+      case "in_progress": return "border-l-blue-500";
+      case "escalated": return "border-l-red-500";
+      case "overdue": return "border-l-red-600";
+      case "on_hold": return "border-l-gray-500";
+      default: return "border-l-yellow-500"; // open status
+    }
+  };
   const handleQuickStatusUpdate = (newStatus: string) => {
     onStatusUpdate(task.id, newStatus);
     toast({
@@ -152,7 +216,7 @@ export const TaskCard = ({
     });
   };
 
-  const handleAddComment = () => {
+  /*const handleAddComment = () => {
     if (newComment.trim()) {
       onAddComment(task.id, newComment);
       setNewComment("");
@@ -161,7 +225,7 @@ export const TaskCard = ({
         description: "Your comment has been posted",
       });
     }
-  };
+  };*/
 
   const truncateDescription = (text: string, maxLength: number = 100) => {
     if (text.length <= maxLength) return text;
@@ -170,10 +234,12 @@ export const TaskCard = ({
 
   return (
     <Card className={`
+      rounded-lg border bg-card text-card-foreground shadow-sm
       transition-all duration-200 hover:shadow-md 
       ${isSelected ? "ring-2 ring-primary bg-accent/5" : ""}
-      ${task.hasValidationIssues ? "border-l-4 border-l-red-500" : ""}
-      ${task.hasDocumentsPending ? "border-l-4 border-l-orange-500" : ""}
+      ${task.hasValidationIssues ? "border-l-4 border-l-red-500" : 
+        task.hasDocumentsPending ? "border-l-4 border-l-orange-500" : 
+        `border-l-4 ${getStatusBorderColor(task.status)}`}
     `}>
       <CardContent className="p-6">
         <div className="space-y-4">
@@ -215,7 +281,7 @@ export const TaskCard = ({
                 
                 {/* Badges Row */}
                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <Badge className={`${getBucketColor(task.bucket)} text-white text-xs`}>
+                  <Badge className={`${getBucketColor(task.bucket)} text-xs`}>
                     {task.bucket}
                   </Badge>
                   <Badge className={`${getStatusColor(task.status)} text-xs`}>
@@ -224,12 +290,12 @@ export const TaskCard = ({
                   <Badge className={`${getPriorityColor(task.priority)} text-xs`}>
                     {task.priority}
                   </Badge>
-                  {task.tags.map(tag => (
+                  {Array.isArray(task.tags) ? task.tags.map(tag => (
                     <Badge key={tag} variant="outline" className="text-xs">
                       <Tag className="w-3 h-3 mr-1" />
                       {tag}
                     </Badge>
-                  ))}
+                  )) : null}
                 </div>
                 
                 {/* Task Details Row */}
@@ -344,7 +410,13 @@ export const TaskCard = ({
                 </div>
               </AccordionTrigger>
               <AccordionContent>
-                <TaskComments taskId={task.id} onAddComment={onAddComment} />
+                <TaskComments 
+                  taskId={task.id} 
+                  comments={comments}
+                  isLoading={isLoadingComments}
+                  onAddComment={handleAddComment}
+                  onLoadComments={loadComments}
+                />
               </AccordionContent>
             </AccordionItem>
             
@@ -357,7 +429,10 @@ export const TaskCard = ({
                 </div>
               </AccordionTrigger>
               <AccordionContent>
-                <TaskDocuments taskId={task.id} />
+                <TaskDocuments 
+                  taskId={task.id} 
+                  onDocumentUpload={(taskId, file) => onDocumentUpload?.(taskId, file)}
+                />
               </AccordionContent>
             </AccordionItem>
             

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Download, Upload, FileText } from "lucide-react";
@@ -8,8 +8,10 @@ import { TaskFilters } from "./tasks/TaskFilters";
 import { TaskCard, type EnhancedTask } from "./tasks/TaskCard";
 import { BulkActions } from "./tasks/BulkActions";
 import CreateTaskDialog from "./CreateTaskDialog";
-import { uploadTasksCSV, transformUploadedTask, transformUploadedTaskForAPI, createTask, reassignTask, type TaskUploadData } from "@/utils/api";
+import { uploadTasksCSV, transformUploadedTask, transformUploadedTaskForAPI, createTask, reassignTask, getAllTasks, type TaskUploadData } from "@/utils/api";
 import { TaskUploadProgress } from "./TaskUploadProgress";
+import { parseExcelDate } from "@/utils/dateUtils";
+import { uploadTaskDocument } from "@/utils/api";
 
 interface TaskListViewProps {
   tasks: any[];
@@ -37,6 +39,71 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
   const [isUploading, setIsUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const [showUploadResult, setShowUploadResult] = useState(false);
+
+  // API tasks state
+  const [apiTasks, setApiTasks] = useState<EnhancedTask[]>([]);
+  const [isLoadingApiTasks, setIsLoadingApiTasks] = useState(false);
+
+  // Transform API task to EnhancedTask format
+  const transformApiTaskToEnhanced = (apiTask: any): EnhancedTask => {
+    const dueDate = apiTask.dueDate ? new Date(apiTask.dueDate) : 
+                   apiTask.due_date ? parseExcelDate(apiTask.due_date) : 
+                   new Date();
+    
+    return {
+      id: apiTask.id || apiTask._id || Math.random().toString(),
+      title: apiTask.title || apiTask.name || "Untitled Task",
+      description: apiTask.description || "",
+      status: (apiTask.status || "open") as EnhancedTask['status'],
+      priority: (apiTask.priority || "medium") as EnhancedTask['priority'],
+      assignee: apiTask.assignedTo || apiTask.assigned_to || "unassigned",
+      assigneeName: apiTask.assignedToName || apiTask.assigned_to_name || apiTask.assignedTo || "Unassigned",
+      dueDate,
+      createdDate: apiTask.createdAt ? new Date(apiTask.createdAt) : new Date(),
+      bucket: apiTask.bucket || apiTask.complianceType || "General",
+      frequency: apiTask.frequency || "one-time",
+      entity: apiTask.entity || "Unknown Entity",
+      tags: apiTask.tags || [],
+      dependencies: apiTask.dependencies || [],
+      hasDocumentsPending: apiTask.hasDocumentsPending || false,
+      hasValidationIssues: apiTask.hasValidationIssues || false,
+      estimatedHours: apiTask.estimatedHours || 0,
+      completedHours: apiTask.completedHours || 0,
+      lastUpdated: apiTask.updatedAt ? new Date(apiTask.updatedAt) : new Date(),
+      aiSuggestions: apiTask.ai_doc_suggestions?.summary ? [apiTask.ai_doc_suggestions.summary] : (apiTask.aiSuggestions || []),
+      closureRightsEmail: apiTask.closureRightsEmail || ""
+    };
+  };
+
+  // Load API tasks on component mount
+  useEffect(() => {
+    const fetchApiTasks = async () => {
+      setIsLoadingApiTasks(true);
+      try {
+        const result = await getAllTasks();
+        if (result.success && result.data) {
+          const transformedTasks = result.data.map(transformApiTaskToEnhanced);
+          setApiTasks(transformedTasks);
+        } else {
+          toast({
+            title: "Failed to Load Tasks",
+            description: result.error || "Could not fetch tasks from server",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        toast({
+          title: "Error Loading Tasks",
+          description: "An unexpected error occurred while loading tasks",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoadingApiTasks(false);
+      }
+    };
+
+    fetchApiTasks();
+  }, [toast]);
 
   // Mock enhanced tasks data
   const enhancedTasks: EnhancedTask[] = [
@@ -86,9 +153,10 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
     }
   ];
 
-  // Filter tasks based on current filters
+  // Combine API tasks with mock tasks and filter
   const getFilteredTasks = () => {
-    return enhancedTasks.filter(task => {
+    const allTasks = [...apiTasks, ...enhancedTasks];
+    return allTasks.filter(task => {
       if (filters.search && !task.title.toLowerCase().includes(filters.search.toLowerCase()) &&
           !task.description.toLowerCase().includes(filters.search.toLowerCase()) &&
           !task.assigneeName.toLowerCase().includes(filters.search.toLowerCase())) {
@@ -204,13 +272,37 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
   };
 
   const handleAddComment = (taskId: string, comment: string) => {
-    // TODO: Call API to add comment to task
+    // This is now handled directly in TaskCard component
     toast({ title: "Comment Added", description: "Your comment has been posted" });
   };
 
   const handleTagUpdate = (taskId: string, tags: string[]) => {
     // TODO: Call API to update task tags
     toast({ title: "Tags Updated", description: "Task tags have been updated" });
+  };
+
+  const handleDocumentUpload = async (taskId: string, file: File) => {
+    try {
+      const result = await uploadTaskDocument(taskId, file);
+      if (result.success) {
+        toast({
+          title: "Document Uploaded",
+          description: `${file.name} has been uploaded to task successfully`,
+        });
+      } else {
+        toast({
+          title: "Upload Failed",
+          description: result.error || "Failed to upload document",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Upload Error",
+        description: "An error occurred while uploading the document",
+        variant: "destructive"
+      });
+    }
   };
 
   // CSV functionality
@@ -407,7 +499,10 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Enhanced Tasks</h2>
-          <p className="text-muted-foreground">Manage compliance tasks with advanced features</p>
+          <p className="text-muted-foreground">
+            Manage compliance tasks with advanced features 
+            {isLoadingApiTasks && " (Loading API tasks...)"}
+          </p>
         </div>
         
         <div className="flex gap-2">
@@ -489,6 +584,15 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
       />
 
       {/* Task List */}
+      {isLoadingApiTasks && (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading tasks from server...</p>
+          </CardContent>
+        </Card>
+      )}
+      
       <div className="space-y-4">
         {filteredTasks.map((task) => (
           <TaskCard
@@ -502,6 +606,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
             onTagUpdate={handleTagUpdate}
             isSelected={selectedTasks.includes(task.id)}
             onSelectionChange={handleSelectionChange}
+            onDocumentUpload={handleDocumentUpload}
           />
         ))}
       </div>
@@ -513,6 +618,12 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
           </CardContent>
         </Card>
       )}
+
+      {/* Show total count */}
+      <div className="text-sm text-muted-foreground text-center py-4">
+        Showing {filteredTasks.length} tasks 
+        {apiTasks.length > 0 && ` (${apiTasks.length} from server, ${enhancedTasks.length} local)`}
+      </div>
 
       {/* Upload Progress/Result */}
       <TaskUploadProgress

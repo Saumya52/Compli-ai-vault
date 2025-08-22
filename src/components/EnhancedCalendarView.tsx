@@ -40,6 +40,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addDays, isToday, differenceInDays } from "date-fns";
 import { getAllTasks } from "@/utils/api";
 import { parseExcelDate } from "@/utils/dateUtils";
+import { CalendarTaskDialog } from "./CalendarTaskDialog";
+import { TaskDetailDialog } from "./TaskDetailDialog";
 
 type CalendarView = "month" | "week" | "list" | "compliance_type" | "ai_generator";
 type ComplianceBucket = "GST" | "TDS" | "ROC" | "PF" | "ESI" | "Income Tax" | "Labor Law";
@@ -92,6 +94,11 @@ export const EnhancedCalendarView = ({ tasks, isLoading = false }: CalendarViewP
   const [hoveredTask, setHoveredTask] = useState<ComplianceTask | null>(null);
   const [showExternalSync, setShowExternalSync] = useState(false);
   const [apiTasks, setApiTasks] = useState<ComplianceTask[]>([]);
+  
+  // New state for task dialogs
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
+  const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<ComplianceTask | null>(null);
   
   // AI Generator states
   const [aiStep, setAiStep] = useState<"company_details" | "questionnaire" | "results">("company_details");
@@ -250,7 +257,14 @@ export const EnhancedCalendarView = ({ tasks, isLoading = false }: CalendarViewP
   // Handle date cell click
   const handleDateCellClick = (date: Date) => {
     setSelectedDate(date);
-    setIsCreateTaskOpen(true);
+    setIsTaskDialogOpen(true);
+  };
+
+  // Handle view task details
+  const handleViewTask = (task: ComplianceTask) => {
+    setSelectedTaskForDetail(task);
+    setIsTaskDetailOpen(true);
+    setIsTaskDialogOpen(false);
   };
 
   // Handle task creation
@@ -921,6 +935,22 @@ export const EnhancedCalendarView = ({ tasks, isLoading = false }: CalendarViewP
           </div>
         </div>
       )}
+
+      {/* Calendar Task Dialog */}
+      <CalendarTaskDialog
+        isOpen={isTaskDialogOpen}
+        onClose={() => setIsTaskDialogOpen(false)}
+        selectedDate={selectedDate}
+        tasks={allTasks}
+        onViewTask={handleViewTask}
+      />
+
+      {/* Task Detail Dialog */}
+      <TaskDetailDialog
+        isOpen={isTaskDetailOpen}
+        onClose={() => setIsTaskDetailOpen(false)}
+        task={selectedTaskForDetail}
+      />
 
       {/* AI Suggestions Dialog */}
       <Dialog open={isAISuggestionsOpen} onOpenChange={setIsAISuggestionsOpen}>

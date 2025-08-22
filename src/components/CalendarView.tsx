@@ -7,6 +7,8 @@ import { Calendar as CalendarIcon, Plus, Users, Settings } from "lucide-react";
 import { EnhancedCalendarView } from "./EnhancedCalendarView";
 import { getAllTasks } from "@/utils/api";
 import { useToast } from "@/hooks/use-toast";
+import { CalendarTaskDialog } from "./CalendarTaskDialog";
+import { TaskDetailDialog } from "./TaskDetailDialog";
 
 interface CalendarViewProps {
   tasks: any[];
@@ -17,6 +19,10 @@ const CalendarView = ({ tasks }: CalendarViewProps) => {
   const [showEnhanced, setShowEnhanced] = useState(true);
   const [apiTasks, setApiTasks] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
+  const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<any>(null);
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -48,6 +54,19 @@ const CalendarView = ({ tasks }: CalendarViewProps) => {
 
   // Combine local tasks with API tasks
   const allTasks = [...tasks, ...apiTasks];
+
+  // Handle date cell click for basic calendar
+  const handleDateCellClick = (date: Date) => {
+    setSelectedDate(date);
+    setIsTaskDialogOpen(true);
+  };
+
+  // Handle view task details
+  const handleViewTask = (task: any) => {
+    setSelectedTaskForDetail(task);
+    setIsTaskDetailOpen(true);
+    setIsTaskDialogOpen(false);
+  };
 
   if (showEnhanced) {
     return <EnhancedCalendarView tasks={allTasks} isLoading={isLoading} />;
@@ -97,7 +116,15 @@ const CalendarView = ({ tasks }: CalendarViewProps) => {
           
           <div className="grid grid-cols-7 gap-2">
             {Array.from({ length: 35 }, (_, i) => (
-              <div key={i} className="aspect-square border rounded-lg p-2 hover:bg-accent cursor-pointer">
+              <div 
+                key={i} 
+                className="aspect-square border rounded-lg p-2 hover:bg-accent cursor-pointer"
+                onClick={() => {
+                  const cellDate = new Date();
+                  cellDate.setDate(((i % 31) + 1));
+                  handleDateCellClick(cellDate);
+                }}
+              >
                 <div className="text-sm">{((i % 31) + 1)}</div>
                 {allTasks.some(task => {
                   const taskDate = new Date(task.dueDate || task.due_date);
@@ -114,6 +141,22 @@ const CalendarView = ({ tasks }: CalendarViewProps) => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Calendar Task Dialog */}
+      <CalendarTaskDialog
+        isOpen={isTaskDialogOpen}
+        onClose={() => setIsTaskDialogOpen(false)}
+        selectedDate={selectedDate}
+        tasks={allTasks}
+        onViewTask={handleViewTask}
+      />
+
+      {/* Task Detail Dialog */}
+      <TaskDetailDialog
+        isOpen={isTaskDetailOpen}
+        onClose={() => setIsTaskDetailOpen(false)}
+        task={selectedTaskForDetail}
+      />
     </div>
   );
 };

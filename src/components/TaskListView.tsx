@@ -285,10 +285,37 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
     try {
       const result = await uploadTaskDocument(taskId, file);
       if (result.success) {
+        // Extract AI suggestions from the response
+        const aiSuggestion = result.data?.ai_doc_suggestions?.summary;
+        
+        // Dispatch custom event for AI suggestions panel
+        if (aiSuggestion && aiSuggestion.trim() && !aiSuggestion.includes("no content provided")) {
+          const event = new CustomEvent('ai-suggestion', {
+            detail: {
+              suggestion: aiSuggestion,
+              taskId: taskId,
+              documentName: file.name
+            }
+          });
+          window.dispatchEvent(event);
+        }
+        
         toast({
           title: "Document Uploaded",
-          description: `${file.name} has been uploaded to task successfully`,
+          description: aiSuggestion 
+            ? `${file.name} uploaded. AI Analysis: ${aiSuggestion.substring(0, 100)}${aiSuggestion.length > 100 ? '...' : ''}`
+            : `${file.name} has been uploaded to task successfully`,
         });
+        
+        // Show AI suggestions in a separate notification if available
+        if (aiSuggestion && aiSuggestion.trim() && !aiSuggestion.includes("no content provided")) {
+          setTimeout(() => {
+            toast({
+              title: "AI Document Analysis",
+              description: aiSuggestion,
+            });
+          }, 1500);
+        }
       } else {
         toast({
           title: "Upload Failed",

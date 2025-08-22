@@ -13,6 +13,7 @@ import MISReports from "@/components/MISReports";
 import Settings from "@/components/Settings";
 import FormPvtLtd from "@/components/FormPvtLtd";
 import { AINudgesPanel } from "@/components/AINudgesPanel";
+import { AISuggestionsPanel } from "@/components/AISuggestionsPanel";
 import { ComplianceHealthTrend } from "@/components/ComplianceHealthTrend";
 import { QuickFilterPanel } from "@/components/QuickFilterPanel";
 import { AlertCenter } from "@/components/AlertCenter";
@@ -179,7 +180,10 @@ const Index = () => {
                     />
                     
                     {roleConfig.showAINudges && (
-                      <AINudgesPanel userRole={userRole} userId="current-user" />
+                      <div className="space-y-6">
+                        <AINudgesPanel userRole={userRole} userId="current-user" />
+                        <AISuggestionsPanel />
+                      </div>
                     )}
                   </div>
 

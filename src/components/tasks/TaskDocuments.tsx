@@ -112,10 +112,37 @@ export const TaskDocuments = ({ taskId, onDocumentUpload }: TaskDocumentsProps) 
       setUploadProgress(100);
       
       if (result.success) {
+        // Extract AI suggestions from the response
+        const aiSuggestion = result.data?.ai_doc_suggestions?.summary;
+        
+        // Dispatch custom event for AI suggestions panel
+        if (aiSuggestion && aiSuggestion.trim() && !aiSuggestion.includes("no content provided")) {
+          const event = new CustomEvent('ai-suggestion', {
+            detail: {
+              suggestion: aiSuggestion,
+              taskId: taskId,
+              documentName: file.name
+            }
+          });
+          window.dispatchEvent(event);
+        }
+        
         toast({
           title: "Upload Successful",
-          description: `${file.name} has been uploaded successfully`,
+          description: aiSuggestion 
+            ? `${file.name} uploaded. AI Analysis: ${aiSuggestion.substring(0, 100)}${aiSuggestion.length > 100 ? '...' : ''}`
+            : `${file.name} has been uploaded successfully`,
         });
+        
+        // If there are AI suggestions, show them in a separate notification
+        if (aiSuggestion && aiSuggestion.trim() && !aiSuggestion.includes("no content provided")) {
+          setTimeout(() => {
+            toast({
+              title: "AI Document Analysis",
+              description: aiSuggestion,
+            });
+          }, 1500);
+        }
         
         // Refresh documents list from API
         await loadDocuments();

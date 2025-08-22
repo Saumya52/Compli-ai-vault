@@ -190,7 +190,7 @@ export const uploadTaskDocument = async (taskId: string, file: File, documentTyp
     const result = await response.json();
     return {
       success: true,
-      data: result.data || result,
+      data: result.doc || result.data || result,
       message: result.message
     };
   } catch (error) {

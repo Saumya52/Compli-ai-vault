@@ -89,6 +89,24 @@ export const TaskCard = ({
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [realtimeAISuggestions, setRealtimeAISuggestions] = useState<string[]>([]);
+
+  // Listen for real-time AI suggestions for this specific task
+  React.useEffect(() => {
+    const handleAISuggestion = (event: CustomEvent) => {
+      const { suggestion, taskId: suggestionTaskId } = event.detail;
+      
+      if (suggestionTaskId === task.id && suggestion && suggestion.trim()) {
+        setRealtimeAISuggestions(prev => [suggestion, ...prev.slice(0, 2)]); // Keep last 3 suggestions
+      }
+    };
+
+    window.addEventListener('ai-suggestion', handleAISuggestion as EventListener);
+    
+    return () => {
+      window.removeEventListener('ai-suggestion', handleAISuggestion as EventListener);
+    };
+  }, [task.id]);
 
   // Load comments when task card is expanded
   const loadComments = async () => {
@@ -382,13 +400,26 @@ export const TaskCard = ({
           </div>
 
           {/* AI Suggestions */}
-          {task.aiSuggestions.length > 0 && (
+          {(task.aiSuggestions.length > 0 || realtimeAISuggestions.length > 0) && (
             <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
               <div className="flex items-center gap-2 mb-2">
                 <Brain className="w-4 h-4 text-blue-600" />
                 <span className="text-sm font-medium text-blue-800 dark:text-blue-200">AI Suggestions</span>
+                {realtimeAISuggestions.length > 0 && (
+                  <Badge variant="secondary" className="text-xs animate-pulse">
+                    New
+                  </Badge>
+                )}
               </div>
               <div className="space-y-1">
+                {/* Show real-time suggestions first */}
+                {realtimeAISuggestions.map((suggestion, index) => (
+                  <div key={`realtime-${index}`} className="text-xs text-blue-700 dark:text-blue-300 flex items-center gap-1 bg-blue-100 dark:bg-blue-900 p-2 rounded">
+                    <ArrowRight className="w-3 h-3" />
+                    <span className="font-medium">Latest:</span> {suggestion}
+                  </div>
+                ))}
+                {/* Show existing suggestions */}
                 {task.aiSuggestions.map((suggestion, index) => (
                   <div key={index} className="text-xs text-blue-700 dark:text-blue-300 flex items-center gap-1">
                     <ArrowRight className="w-3 h-3" />

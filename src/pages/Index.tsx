@@ -210,7 +210,6 @@ const Index = () => {
       <DashboardHeader 
         currentView={currentView} 
         onNavigate={handleNavigation}
-        onAddClient={() => setShowClientOnboarding(true)}
       />
       
       <ClientOnboardingWizard

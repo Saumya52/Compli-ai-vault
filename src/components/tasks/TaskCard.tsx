@@ -30,7 +30,7 @@ import { format } from "date-fns";
 import { TaskComments } from "./TaskComments";
 import { TaskDocuments } from "./TaskDocuments";
 import { TaskDependencies } from "./TaskDependencies";
-import { reassignTask, uploadTaskDocument, getTaskComments, addTaskComment } from "@/utils/api";
+import { reassignTask, uploadTaskDocument } from "@/utils/api";
 import { useAuth } from "@/contexts/AuthContext";
 
 export interface EnhancedTask {
@@ -85,10 +85,7 @@ export const TaskCard = ({
   const { toast } = useToast();
   const { user } = useAuth();
   const [isReassignDialogOpen, setIsReassignDialogOpen] = useState(false);
-  const [newComment, setNewComment] = useState("");
   const [showFullDescription, setShowFullDescription] = useState(false);
-  const [comments, setComments] = useState<any[]>([]);
-  const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [realtimeAISuggestions, setRealtimeAISuggestions] = useState<string[]>([]);
 
   // Listen for real-time AI suggestions for this specific task
@@ -108,53 +105,12 @@ export const TaskCard = ({
     };
   }, [task.id]);
 
-  // Load comments when task card is expanded
-  const loadComments = async () => {
-    setIsLoadingComments(true);
-    try {
-      const result = await getTaskComments(task.id);
-      if (result.success && result.data) {
-        setComments(result.data);
-      }
-    } catch (error) {
-      console.error('Failed to load comments:', error);
-    } finally {
-      setIsLoadingComments(false);
-    }
-  };
 
-  const handleAddComment = async (comment: string) => {
-    if (!user?.id || !comment.trim()) return;
-    
-    try {
-      const result = await addTaskComment(task.id, {
-        content: comment,
-        userId: user.id,
-        userName: user.name
-      });
-      
-      if (result.success) {
-        // Refresh comments
-        await loadComments();
-        toast({
-          title: "Comment Added",
-          description: "Your comment has been posted successfully",
-        });
-      } else {
-        toast({
-          title: "Failed to Add Comment",
-          description: result.error || "Could not add comment",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "An error occurred while adding the comment",
-        variant: "destructive"
-      });
-    }
+  const handleAddCommentLocal = async (comment: string) => {
+    // Call the parent handler for any additional logic
+    onAddComment(task.id, comment);
   };
+  
   const getStatusColor = (status: string) => {
     switch (status) {
       case "completed": return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
@@ -443,10 +399,7 @@ export const TaskCard = ({
               <AccordionContent>
                 <TaskComments 
                   taskId={task.id} 
-                  comments={comments}
-                  isLoading={isLoadingComments}
-                  onAddComment={handleAddComment}
-                  onLoadComments={loadComments}
+                  onAddComment={handleAddCommentLocal}
                 />
               </AccordionContent>
             </AccordionItem>

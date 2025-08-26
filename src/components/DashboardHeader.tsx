@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { UserManagementDialog } from "@/components/UserManagementDialog";
 import { ClientSwitcher } from "@/components/ClientSwitcher";
 import { useAuth } from "@/contexts/AuthContext";
+import { useClient } from "@/contexts/ClientContext";
 
 interface DashboardHeaderProps {
   currentView?: string;
@@ -15,7 +16,17 @@ interface DashboardHeaderProps {
 
 const DashboardHeader = ({ currentView = "dashboard", onNavigate, onAddClient }: DashboardHeaderProps) => {
   const { user, logout } = useAuth();
+  const { refreshClients } = useClient();
 
+  const handleAddClient = async () => {
+    if (onAddClient) {
+      onAddClient();
+      // Refresh clients after potential addition
+      setTimeout(() => {
+        refreshClients();
+      }, 1000);
+    }
+  };
   return (
     <header className="bg-card border-b border-border shadow-soft">
       <div className="container mx-auto px-6 py-4">
@@ -32,7 +43,7 @@ const DashboardHeader = ({ currentView = "dashboard", onNavigate, onAddClient }:
             </div>
             
             {/* Client Switcher */}
-            <ClientSwitcher onAddClient={onAddClient} />
+            <ClientSwitcher onAddClient={handleAddClient} />
             
             <nav className="hidden md:flex items-center space-x-6">
               <Button 

@@ -290,6 +290,136 @@ export const getTaskDocuments = async (taskId: string): Promise<ApiResponse> => 
     };
   }
 };
+
+// Comment API functions
+export const createComment = async (commentData: {
+  content: string;
+  user: string;
+  task?: string;
+  doc?: string;
+  parent?: string;
+}): Promise<ApiResponse> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/comments/create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(commentData),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: true,
+      data: result.comment || result.data || result,
+      message: result.message
+    };
+  } catch (error) {
+    console.error('Create comment error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create comment'
+    };
+  }
+};
+
+export const getAllComments = async (taskId?: string, docId?: string): Promise<ApiResponse> => {
+  try {
+    const params = new URLSearchParams();
+    if (taskId) params.append('task', taskId);
+    if (docId) params.append('doc', docId);
+    
+    const response = await fetch(`${API_BASE_URL}/comments/all?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: true,
+      data: result.comments || result.data || [],
+      message: result.message
+    };
+  } catch (error) {
+    console.error('Get comments error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch comments'
+    };
+  }
+};
+
+export const likeComment = async (commentId: string): Promise<ApiResponse> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/comments/like/${commentId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: true,
+      data: result.comment || result.data || result,
+      message: result.message
+    };
+  } catch (error) {
+    console.error('Like comment error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to like comment'
+    };
+  }
+};
+
+export const replyToComment = async (parentId: string, replyData: {
+  content: string;
+  user: string;
+  task?: string;
+  doc?: string;
+}): Promise<ApiResponse> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/comments/reply/${parentId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(replyData),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: true,
+      data: result.reply || result.data || result,
+      message: result.message
+    };
+  } catch (error) {
+    console.error('Reply to comment error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to add reply'
+    };
+  }
+};
 export const getAllTasks = async (): Promise<ApiResponse<any[]>> => {
   try {
     const response = await fetch(`${API_BASE_URL}/tasks/get-all-tasks`, {

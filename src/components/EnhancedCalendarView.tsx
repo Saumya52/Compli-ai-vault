@@ -116,12 +116,24 @@ export const EnhancedCalendarView = ({ tasks, isLoading = false }: CalendarViewP
 
   // Transform API tasks to calendar format
   const transformApiTask = (apiTask: any): ComplianceTask => {
-    const dueDate = apiTask.dueDate ? new Date(apiTask.dueDate) : 
-                   apiTask.due_date ? parseExcelDate(apiTask.due_date) : 
-                   new Date();
+    // Handle the backend date format - it seems to be a timestamp in seconds since epoch
+    let dueDate = new Date();
+    if (apiTask.dueDate) {
+      const dateValue = new Date(apiTask.dueDate);
+      // Check if it's a valid date, if not try parsing as timestamp
+      if (isNaN(dateValue.getTime())) {
+        // Try parsing as timestamp in seconds
+        const timestamp = parseFloat(apiTask.dueDate);
+        if (!isNaN(timestamp)) {
+          dueDate = new Date(timestamp * 1000);
+        }
+      } else {
+        dueDate = dateValue;
+      }
+    }
     
     return {
-      id: apiTask.id || apiTask._id || Math.random().toString(),
+      id: apiTask._id || apiTask.id || Math.random().toString(),
       title: apiTask.title || apiTask.name || "Untitled Task",
       description: apiTask.description || "",
       dueDate,
@@ -131,7 +143,7 @@ export const EnhancedCalendarView = ({ tasks, isLoading = false }: CalendarViewP
       assignedToName: apiTask.assignedToName || apiTask.assigned_to_name || apiTask.assignedTo || "Unassigned",
       status: (apiTask.status || "pending") as TaskStatus,
       urgencyLevel: calculateUrgencyLevel(dueDate),
-      isRecurring: apiTask.frequency !== "one-time",
+      isRecurring: apiTask.recurringFrequency !== "one-time" && apiTask.recurringFrequency !== "once",
       priority: (apiTask.priority || "medium") as "low" | "medium" | "high"
     };
   };

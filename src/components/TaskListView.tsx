@@ -11,7 +11,7 @@ import CreateTaskDialog from "./CreateTaskDialog";
 import { uploadTasksCSV, transformUploadedTask, transformUploadedTaskForAPI, createTask, reassignTask, getAllTasks, type TaskUploadData } from "@/utils/api";
 import { TaskUploadProgress } from "./TaskUploadProgress";
 import { parseExcelDate } from "@/utils/dateUtils";
-import { uploadTaskDocument } from "@/utils/api";
+import { uploadTaskDocument, getTasksPaginated } from "@/utils/api";
 
 interface TaskListViewProps {
   tasks: any[];
@@ -43,15 +43,31 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
   // API tasks state
   const [apiTasks, setApiTasks] = useState<EnhancedTask[]>([]);
   const [isLoadingApiTasks, setIsLoadingApiTasks] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalTasks, setTotalTasks] = useState(0);
+  const [pageSize] = useState(10);
 
   // Transform API task to EnhancedTask format
   const transformApiTaskToEnhanced = (apiTask: any): EnhancedTask => {
-    const dueDate = apiTask.dueDate ? new Date(apiTask.dueDate) : 
-                   apiTask.due_date ? parseExcelDate(apiTask.due_date) : 
-                   new Date();
+    // Handle the backend date format - it seems to be a timestamp in seconds since epoch
+    let dueDate = new Date();
+    if (apiTask.dueDate) {
+      const dateValue = new Date(apiTask.dueDate);
+      // Check if it's a valid date, if not try parsing as timestamp
+      if (isNaN(dateValue.getTime())) {
+        // Try parsing as timestamp in seconds
+        const timestamp = parseFloat(apiTask.dueDate);
+        if (!isNaN(timestamp)) {
+          dueDate = new Date(timestamp * 1000);
+        }
+      } else {
+        dueDate = dateValue;
+      }
+    }
     
     return {
-      id: apiTask.id || apiTask._id || Math.random().toString(),
+      id: apiTask._id || apiTask.id || Math.random().toString(),
       title: apiTask.title || apiTask.name || "Untitled Task",
       description: apiTask.description || "",
       status: (apiTask.status || "open") as EnhancedTask['status'],
@@ -61,9 +77,9 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
       dueDate,
       createdDate: apiTask.createdAt ? new Date(apiTask.createdAt) : new Date(),
       bucket: apiTask.bucket || apiTask.complianceType || "General",
-      frequency: apiTask.frequency || "one-time",
+      frequency: apiTask.recurringFrequency || apiTask.frequency || "one-time",
       entity: apiTask.entity || "Unknown Entity",
-      tags: apiTask.tags || [],
+      tags: apiTask.tags ? (typeof apiTask.tags === 'string' ? apiTask.tags.split(',').map(t => t.trim()) : apiTask.tags) : [],
       dependencies: apiTask.dependencies || [],
       hasDocumentsPending: apiTask.hasDocumentsPending || false,
       hasValidationIssues: apiTask.hasValidationIssues || false,
@@ -75,15 +91,17 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
     };
   };
 
-  // Load API tasks on component mount
+  // Load API tasks with pagination
   useEffect(() => {
-    const fetchApiTasks = async () => {
+    const fetchPaginatedTasks = async () => {
       setIsLoadingApiTasks(true);
       try {
-        const result = await getAllTasks();
+        const result = await getTasksPaginated(currentPage, pageSize);
         if (result.success && result.data) {
-          const transformedTasks = result.data.map(transformApiTaskToEnhanced);
+          const transformedTasks = result.data.tasks.map(transformApiTaskToEnhanced);
           setApiTasks(transformedTasks);
+          setTotalPages(result.data.totalPages);
+          setTotalTasks(result.data.totalTasks);
         } else {
           toast({
             title: "Failed to Load Tasks",
@@ -102,9 +120,13 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
       }
     };
 
-    fetchApiTasks();
-  }, [toast]);
+    fetchPaginatedTasks();
+  }, [currentPage, pageSize, toast]);
 
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+  };
   // Mock enhanced tasks data
   const enhancedTasks: EnhancedTask[] = [
     {
@@ -155,7 +177,7 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
 
   // Combine API tasks with mock tasks and filter
   const getFilteredTasks = () => {
-    const allTasks = [...apiTasks, ...enhancedTasks];
+    const allTasks = [...apiTasks];
     return allTasks.filter(task => {
       if (filters.search && !task.title.toLowerCase().includes(filters.search.toLowerCase()) &&
           !task.description.toLowerCase().includes(filters.search.toLowerCase()) &&
@@ -648,9 +670,59 @@ export const TaskListView: React.FC<TaskListViewProps> = ({ tasks, onTaskCreate 
 
       {/* Show total count */}
       <div className="text-sm text-muted-foreground text-center py-4">
-        Showing {filteredTasks.length} tasks 
-        {apiTasks.length > 0 && ` (${apiTasks.length} from server, ${enhancedTasks.length} local)`}
+        Showing {filteredTasks.length} of {totalTasks} tasks (Page {currentPage} of {totalPages})
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 py-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1 || isLoadingApiTasks}
+          >
+            Previous
+          </Button>
+          
+          <div className="flex items-center gap-1">
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum;
+              if (totalPages <= 5) {
+                pageNum = i + 1;
+              } else if (currentPage <= 3) {
+                pageNum = i + 1;
+              } else if (currentPage >= totalPages - 2) {
+                pageNum = totalPages - 4 + i;
+              } else {
+                pageNum = currentPage - 2 + i;
+              }
+              
+              return (
+                <Button
+                  key={pageNum}
+                  variant={currentPage === pageNum ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handlePageChange(pageNum)}
+                  disabled={isLoadingApiTasks}
+                  className="w-8 h-8 p-0"
+                >
+                  {pageNum}
+                </Button>
+              );
+            })}
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages || isLoadingApiTasks}
+          >
+            Next
+          </Button>
+        </div>
+      )}
 
       {/* Upload Progress/Result */}
       <TaskUploadProgress

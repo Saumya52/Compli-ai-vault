@@ -422,7 +422,7 @@ export const replyToComment = async (parentId: string, replyData: {
 };
 export const getAllTasks = async (): Promise<ApiResponse<any[]>> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/tasks/get-all-tasks`, {
+    const response = await fetch(`${API_BASE_URL}/tasks/get-all-tasks?limit=1000`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -437,11 +437,52 @@ export const getAllTasks = async (): Promise<ApiResponse<any[]>> => {
 
     return {
       success: true,
-      data: result.tasks || [], // ✅ directly unwrap tasks array
+      data: result.tasks || [],
       message: result.message,
     };
   } catch (error) {
     console.error("Get all tasks error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch tasks",
+    };
+  }
+};
+
+export const getTasksPaginated = async (page: number = 1, limit: number = 10): Promise<ApiResponse<{
+  tasks: any[];
+  page: number;
+  limit: number;
+  totalPages: number;
+  totalTasks: number;
+}>> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/tasks/get-all-tasks?page=${page}&limit=${limit}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    return {
+      success: true,
+      data: {
+        tasks: result.tasks || [],
+        page: result.page || 1,
+        limit: result.limit || 10,
+        totalPages: result.totalPages || 1,
+        totalTasks: result.totalTasks || 0
+      },
+      message: result.message,
+    };
+  } catch (error) {
+    console.error("Get paginated tasks error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to fetch tasks",

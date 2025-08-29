@@ -28,6 +28,7 @@ const CalendarView = ({ tasks }: CalendarViewProps) => {
     const fetchTasks = async () => {
       setIsLoading(true);
       try {
+        // For calendar view, we want ALL tasks, not paginated
         const result = await getAllTasks();
         if (result.success && result.data) {
           setApiTasks(result.data);

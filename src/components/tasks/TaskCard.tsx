@@ -211,9 +211,7 @@ export const TaskCard = ({
       rounded-lg border bg-card text-card-foreground shadow-sm
       transition-all duration-200 hover:shadow-md 
       ${isSelected ? "ring-2 ring-primary bg-accent/5" : ""}
-      ${task.hasValidationIssues ? "border-l-4 border-l-red-500" : 
-        task.hasDocumentsPending ? "border-l-4 border-l-orange-500" : 
-        `border-l-4 ${getStatusBorderColor(task.status)}`}
+      border-l-4 ${getStatusBorderColor(task.status)}
     `}>
       <CardContent className="p-6">
         <div className="space-y-4">

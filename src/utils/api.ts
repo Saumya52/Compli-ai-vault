@@ -309,6 +309,8 @@ export const createComment = async (commentData: {
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Comment creation failed:', response.status, errorText);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 

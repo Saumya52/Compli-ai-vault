@@ -97,6 +97,12 @@ export const TaskComments = ({
 
     setIsSubmitting(true);
     try {
+      console.log('Creating comment with data:', {
+        content: comment,
+        user: user.id,
+        task: taskId
+      });
+      
       const result = await createComment({
         content: comment,
         user: user.email, // Using email as user identifier
@@ -128,6 +134,7 @@ export const TaskComments = ({
           description: "Your comment has been posted successfully",
         });
       } else {
+        console.error('Comment creation failed:', result.error);
         throw new Error(result.error || "Failed to create comment");
       }
     } catch (error) {
@@ -257,6 +264,7 @@ export const TaskComments = ({
                 onChange={(e) => setReplyText(e.target.value)}
                 className="min-h-16 text-sm"
                 rows={2}
+                autoFocus
               />
               <div className="flex items-center gap-2">
                 <Button

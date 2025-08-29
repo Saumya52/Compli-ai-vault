@@ -26,6 +26,7 @@ import { BillingStatusSnapshot } from "@/components/BillingStatusSnapshot";
 import { AutoComplianceClock } from "@/components/AutoComplianceClock";
 import { RecentAIFeedbackLogs } from "@/components/RecentAIFeedbackLogs";
 import { useAuth } from "@/contexts/AuthContext";
+import { ClientInsightsPanel } from "@/components/ClientInsightsPanel";
 
 const Index = () => {
   const { user } = useAuth();
@@ -178,6 +179,9 @@ const Index = () => {
                       onTaskCreate={handleTaskCreate} 
                       onCalendarView={() => setCurrentView("calendar")} 
                     />
+                    
+                    {/* Client Insights Panel */}
+                    <ClientInsightsPanel />
                     
                     {roleConfig.showAINudges && (
                       <div className="space-y-6">

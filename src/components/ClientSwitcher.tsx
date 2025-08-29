@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { useClient } from "@/contexts/ClientContext";
 import { cn } from "@/lib/utils";
+import { CreateClientDialog } from "@/components/CreateClientDialog";
 
 interface ClientSwitcherProps {
   onAddClient?: () => void;
@@ -13,6 +14,7 @@ interface ClientSwitcherProps {
 
 export const ClientSwitcher = ({ onAddClient }: ClientSwitcherProps) => {
   const [open, setOpen] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { clients, currentClient, setCurrentClient, isLoading } = useClient();
 
   if (isLoading) {
@@ -93,7 +95,7 @@ export const ClientSwitcher = ({ onAddClient }: ClientSwitcherProps) => {
             <CommandGroup>
               <CommandItem
                 onSelect={() => {
-                  onAddClient?.();
+                  setShowCreateDialog(true);
                   setOpen(false);
                 }}
                 className="cursor-pointer border-t"
@@ -105,6 +107,15 @@ export const ClientSwitcher = ({ onAddClient }: ClientSwitcherProps) => {
           </CommandList>
         </Command>
       </PopoverContent>
+      
+      <CreateClientDialog
+        open={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        onSuccess={() => {
+          setShowCreateDialog(false);
+          onAddClient?.();
+        }}
+      />
     </Popover>
   );
 };

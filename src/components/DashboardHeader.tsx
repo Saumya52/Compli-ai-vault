@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { UserManagementDialog } from "@/components/UserManagementDialog";
 import { ClientSwitcher } from "@/components/ClientSwitcher";
+import { ClientManagementDialog } from "@/components/ClientManagementDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useClient } from "@/contexts/ClientContext";
 
@@ -123,6 +124,9 @@ const DashboardHeader = ({ currentView = "dashboard", onNavigate, onAddClient }:
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem asChild>
                   <UserManagementDialog />
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <ClientManagementDialog />
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onNavigate?.("settings")} className="cursor-pointer">
                   <Settings className="w-4 h-4 mr-2" />

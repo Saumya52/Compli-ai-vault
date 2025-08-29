@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getAllClients, createClient as createClientAPI, transformApiClientToUI, type CreateClientData } from '@/utils/clientApi';
+import { useToast } from '@/hooks/use-toast';
 
 export interface Client {
   id: string;
@@ -21,6 +23,8 @@ interface ClientContextType {
   updateClient: (id: string, updates: Partial<Client>) => void;
   deleteClient: (id: string) => void;
   isLoading: boolean;
+  refreshClients: () => Promise<void>;
+  createClientFromAPI: (clientData: CreateClientData) => Promise<boolean>;
 }
 
 const ClientContext = createContext<ClientContextType | undefined>(undefined);
@@ -67,17 +71,83 @@ const mockClients: Client[] = [
 ];
 
 export const ClientProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { toast } = useToast();
   const [clients, setClients] = useState<Client[]>(mockClients);
   const [currentClient, setCurrentClient] = useState<Client | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Load clients from API
+  const loadClientsFromAPI = async () => {
+    try {
+      const result = await getAllClients();
+      if (result.success && result.data) {
+        const transformedClients = result.data.map(transformApiClientToUI);
+        setClients(prev => {
+          // Merge API clients with existing mock clients, avoiding duplicates
+          const existingIds = prev.map(c => c.id);
+          const newClients = transformedClients.filter(c => !existingIds.includes(c.id));
+          return [...prev, ...newClients];
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load clients from API:', error);
+      toast({
+        title: "Error Loading Clients",
+        description: "Failed to load clients from server",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const refreshClients = async () => {
+    setIsLoading(true);
+    await loadClientsFromAPI();
+    setIsLoading(false);
+  };
+
+  const createClientFromAPI = async (clientData: CreateClientData): Promise<boolean> => {
+    try {
+      const result = await createClientAPI(clientData);
+      if (result.success && result.data) {
+        const newClient = transformApiClientToUI(result.data);
+        setClients(prev => [...prev, newClient]);
+        
+        // Set as current client if it's the first one
+        if (clients.length === 0) {
+          setCurrentClient(newClient);
+        }
+        
+        toast({
+          title: "Client Created",
+          description: `${clientData.name} has been created successfully`,
+        });
+        return true;
+      } else {
+        toast({
+          title: "Failed to Create Client",
+          description: result.error || "Unknown error occurred",
+          variant: "destructive"
+        });
+        return false;
+      }
+    } catch (error) {
+      toast({
+        title: "Error Creating Client",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
   useEffect(() => {
-    // Simulate loading and set first client as default
+    // Load clients from API and set first client as default
     const timer = setTimeout(() => {
+      loadClientsFromAPI().then(() => {
       if (clients.length > 0 && !currentClient) {
         setCurrentClient(clients[0]);
       }
       setIsLoading(false);
+      });
     }, 500);
 
     return () => clearTimeout(timer);
@@ -115,7 +185,9 @@ export const ClientProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       addClient,
       updateClient,
       deleteClient,
-      isLoading
+      isLoading,
+      refreshClients,
+      createClientFromAPI
     }}>
       {children}
     </ClientContext.Provider>
